@@ -64,8 +64,8 @@ partial class Form1
         label2.AutoSize = true;
         label2.Location = new System.Drawing.Point(12, 46);
         label2.Name = "label2";
-        label2.Size = new System.Drawing.Size(64, 15);
-        label2.Text = "Servis Adı";
+        label2.Size = new System.Drawing.Size(120, 15);
+        label2.Text = "Servis Adları (virgülle ayrılmış)";
 
         txtServiceName.Location = new System.Drawing.Point(110, 43);
         txtServiceName.Size = new System.Drawing.Size(320, 23);
@@ -109,7 +109,7 @@ partial class Form1
         columnName.Text = "Bağlantı";
         columnName.Width = 150;
 
-        columnService.Text = "Servis";
+        columnService.Text = "Servisler";
         columnService.Width = 180;
 
         columnExe.Text = "Uygulama (EXE)";

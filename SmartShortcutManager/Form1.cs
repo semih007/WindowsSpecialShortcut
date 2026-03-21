@@ -6,6 +6,7 @@ using System.Linq;
 using System.Security.Principal;
 using System.ServiceProcess;
 using System.Text.Json;
+using System.Threading;
 using System.Windows.Forms;
 
 namespace SmartShortcutManager
@@ -93,7 +94,7 @@ namespace SmartShortcutManager
             listViewPairs.Items.Clear();
             foreach (var p in _config.Pairs)
             {
-                var item = new ListViewItem(new[] { p.Name, p.ServiceName, p.ExePath });
+                var item = new ListViewItem(new[] { p.Name, string.Join(", ", p.ServiceNames), p.ExePath });
                 listViewPairs.Items.Add(item);
             }
         }
@@ -158,15 +159,18 @@ namespace SmartShortcutManager
 
         private bool IsPairRunning(ServiceExePair pair)
         {
-            try
+            foreach (var svcName in pair.ServiceNames)
             {
-                using var service = new ServiceController(pair.ServiceName);
-                if (service.Status != ServiceControllerStatus.Running)
+                try
+                {
+                    using var service = new ServiceController(svcName);
+                    if (service.Status != ServiceControllerStatus.Running)
+                        return false;
+                }
+                catch
+                {
                     return false;
-            }
-            catch
-            {
-                return false;
+                }
             }
 
             var exeName = Path.GetFileNameWithoutExtension(pair.ExePath);
@@ -194,26 +198,30 @@ namespace SmartShortcutManager
                 return null;
 
             var sel = listViewPairs.SelectedItems[0];
-            var serviceName = sel.SubItems[1].Text;
+            var serviceNames = sel.SubItems[1].Text.Split(',').Select(s => s.Trim()).ToList();
             var exePath = sel.SubItems[2].Text;
-            return _config.Pairs.FirstOrDefault(x => x.ServiceName == serviceName && x.ExePath == exePath);
+            return _config.Pairs.FirstOrDefault(x => x.ServiceNames.SequenceEqual(serviceNames) && x.ExePath == exePath);
         }
 
         private void btnAdd_Click(object sender, EventArgs e)
         {
-            var newPair = new ServiceExePair { Name = txtMappingName.Text.Trim(), ServiceName = txtServiceName.Text.Trim(), ExePath = txtExePath.Text.Trim() };
-            if (string.IsNullOrWhiteSpace(newPair.Name) || string.IsNullOrWhiteSpace(newPair.ServiceName) || string.IsNullOrWhiteSpace(newPair.ExePath))
+            var serviceNames = txtServiceName.Text.Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
+            var exePath = txtExePath.Text.Trim();
+            var name = txtMappingName.Text.Trim();
+
+            if (string.IsNullOrWhiteSpace(name) || serviceNames.Count == 0 || string.IsNullOrWhiteSpace(exePath))
             {
                 UpdateStatus("Tüm alanlar gereklidir.", true);
                 return;
             }
 
-            if (!File.Exists(newPair.ExePath))
+            if (!File.Exists(exePath))
             {
                 UpdateStatus("Executable dosyası bulunamadı.", true);
                 return;
             }
 
+            var newPair = new ServiceExePair { Name = name, ServiceNames = serviceNames, ExePath = exePath };
             _config.Pairs.Add(newPair);
             SaveConfig();
             RefreshPairs();
@@ -260,19 +268,49 @@ namespace SmartShortcutManager
         {
             try
             {
-                UpdateStatus($"{pair.ServiceName} servisi başlatılıyor...", false);
-                using var service = new ServiceController(pair.ServiceName);
+                UpdateStatus($"{string.Join(", ", pair.ServiceNames)} servisleri başlatılıyor...", false);
 
-                if (service.Status != ServiceControllerStatus.Running)
+                // Tüm servisler için start komutu ver
+                foreach (var svcName in pair.ServiceNames)
                 {
-                    service.Start();
-                    service.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(5));
+                    using var service = new ServiceController(svcName);
+                    if (service.Status != ServiceControllerStatus.Running)
+                    {
+                        service.Start();
+                    }
                 }
 
-                if (service.Status != ServiceControllerStatus.Running)
-                    throw new InvalidOperationException("Servis Running durumuna ulaşamadı.");
+                // Tüm servisler Running olana kadar bekle ve kontrol et
+                var timeout = TimeSpan.FromSeconds(10);
+                var startTime = DateTime.Now;
+                while (DateTime.Now - startTime < timeout)
+                {
+                    bool allRunning = true;
+                    foreach (var svcName in pair.ServiceNames)
+                    {
+                        using var service = new ServiceController(svcName);
+                        if (service.Status != ServiceControllerStatus.Running)
+                        {
+                            allRunning = false;
+                            break;
+                        }
+                    }
+                    if (allRunning)
+                        break;
+                    Thread.Sleep(1000); // 1 saniye bekle
+                }
 
-                UpdateStatus("Servis çalışıyor. Uygulama başlatılıyor...", false);
+                // Son kontrol: hepsi başlamış mı?
+                bool finalCheck = pair.ServiceNames.All(svcName =>
+                {
+                    using var service = new ServiceController(svcName);
+                    return service.Status == ServiceControllerStatus.Running;
+                });
+
+                if (!finalCheck)
+                    throw new InvalidOperationException("Bir veya daha fazla servis Running durumuna ulaşamadı.");
+
+                UpdateStatus("Servisler çalışıyor. Uygulama başlatılıyor...", false);
 
                 if (!File.Exists(pair.ExePath))
                     throw new FileNotFoundException("EXE dosyası bulunamıyor.", pair.ExePath);
@@ -306,6 +344,7 @@ namespace SmartShortcutManager
                 var exeName = Path.GetFileNameWithoutExtension(pair.ExePath);
                 var processes = Process.GetProcessesByName(exeName);
 
+                // Uygulama kapat komutu ver
                 foreach (var p in processes)
                 {
                     if (!p.HasExited)
@@ -323,22 +362,61 @@ namespace SmartShortcutManager
                     }
                 }
 
-                processes = Process.GetProcessesByName(exeName);
-                if (processes.Length > 0)
-                    throw new InvalidOperationException("EXE süreci kapatılamadı.");
-
-                UpdateStatus("Uygulama kapatıldı. Servis durduruluyor...", false);
-
-                using var service = new ServiceController(pair.ServiceName);
-
-                if (service.Status != ServiceControllerStatus.Stopped)
+                // Uygulamanın kapatıldığını kontrol et (process kalmayana kadar bekle)
+                var appTimeout = TimeSpan.FromSeconds(10);
+                var appStartTime = DateTime.Now;
+                while (DateTime.Now - appStartTime < appTimeout)
                 {
-                    service.Stop();
-                    service.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(10));
+                    processes = Process.GetProcessesByName(exeName);
+                    if (processes.Length == 0)
+                        break;
+                    Thread.Sleep(1000);
                 }
 
-                if (service.Status != ServiceControllerStatus.Stopped)
-                    throw new InvalidOperationException("Servis başarılı şekilde durmadı.");
+                if (Process.GetProcessesByName(exeName).Length > 0)
+                    throw new InvalidOperationException("EXE süreci kapatılamadı.");
+
+                UpdateStatus("Uygulama kapatıldı. Servisler durduruluyor...", false);
+
+                // Tüm servisler için stop komutu ver
+                foreach (var svcName in pair.ServiceNames.AsEnumerable().Reverse())
+                {
+                    using var service = new ServiceController(svcName);
+                    if (service.Status != ServiceControllerStatus.Stopped)
+                    {
+                        service.Stop();
+                    }
+                }
+
+                // Tüm servisler Stopped olana kadar bekle ve kontrol et
+                var svcTimeout = TimeSpan.FromSeconds(10);
+                var svcStartTime = DateTime.Now;
+                while (DateTime.Now - svcStartTime < svcTimeout)
+                {
+                    bool allStopped = true;
+                    foreach (var svcName in pair.ServiceNames)
+                    {
+                        using var service = new ServiceController(svcName);
+                        if (service.Status != ServiceControllerStatus.Stopped)
+                        {
+                            allStopped = false;
+                            break;
+                        }
+                    }
+                    if (allStopped)
+                        break;
+                    Thread.Sleep(1000);
+                }
+
+                // Son kontrol: hepsi durmuş mu?
+                bool finalSvcCheck = pair.ServiceNames.All(svcName =>
+                {
+                    using var service = new ServiceController(svcName);
+                    return service.Status == ServiceControllerStatus.Stopped;
+                });
+
+                if (!finalSvcCheck)
+                    throw new InvalidOperationException("Bir veya daha fazla servis başarılı şekilde durmadı.");
             }
             catch (Exception ex)
             {
