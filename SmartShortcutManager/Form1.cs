@@ -15,7 +15,7 @@ namespace SmartShortcutManager
         private readonly string _configPath;
         private readonly Config _config = new();
 
-        public Form1()
+        public Form1(string[] args)
         {
             InitializeComponent();
             _configPath = Path.Combine(Application.StartupPath, "config.json");
@@ -33,7 +33,15 @@ namespace SmartShortcutManager
 
             LoadConfig();
             RefreshPairs();
+
+            if (args != null && args.Length > 0)
+            {
+                HandleCommandLine(args);
+            }
         }
+
+        public Form1() : this(Array.Empty<string>()) { }
+
 
         private bool IsAdministrator()
         {
@@ -88,6 +96,51 @@ namespace SmartShortcutManager
                 var item = new ListViewItem(new[] { p.Name, p.ServiceName, p.ExePath });
                 listViewPairs.Items.Add(item);
             }
+        }
+
+        private void HandleCommandLine(string[] args)
+        {
+            try
+            {
+                if (args.Length >= 2 && (args[0].Equals("--start", StringComparison.OrdinalIgnoreCase) || args[0].Equals("--stop", StringComparison.OrdinalIgnoreCase)))
+                {
+                    var name = args[1].Trim('"');
+                    var start = args[0].Equals("--start", StringComparison.OrdinalIgnoreCase);
+                    RunScenarioByName(name, start);
+
+                    if (start)
+                        UpdateStatus($"{name} için başlatma komutu tamamlandı.", false);
+                    else
+                        UpdateStatus($"{name} için durdurma komutu tamamlandı.", false);
+
+                    // Kısayol üzerinden çalıştırıldıysa formu kapat
+                    Close();
+                    return;
+                }
+                else
+                {
+                    UpdateStatus("Komut satırı parametresi bulunamadı veya geçersiz.", true);
+                }
+            }
+            catch (Exception ex)
+            {
+                UpdateStatus("Komut satırı işleme hatası: " + ex.Message, true);
+            }
+        }
+
+        private void RunScenarioByName(string mapName, bool start)
+        {
+            var pair = _config.Pairs.FirstOrDefault(x => x.Name.Equals(mapName, StringComparison.OrdinalIgnoreCase));
+            if (pair == null)
+            {
+                UpdateStatus($"Eşleşme bulunamadı: {mapName}", true);
+                return;
+            }
+
+            if (start)
+                RunStartScenario(pair);
+            else
+                RunStopScenario(pair);
         }
 
         private ServiceExePair? GetSelectedPair()
@@ -277,9 +330,13 @@ namespace SmartShortcutManager
                 if (shortcut == null)
                     throw new InvalidOperationException("Shortcut oluşturulamadı.");
 
-                shortcut.TargetPath = pair.ExePath;
-                shortcut.WorkingDirectory = Path.GetDirectoryName(pair.ExePath) ?? string.Empty;
-                shortcut.Description = "Akıllı Kısayol Yöneticisi tarafından oluşturuldu.";
+                var managerExe = Application.ExecutablePath;
+                var cmdArgs = $"--start \"{pair.Name}\"";
+
+                shortcut.TargetPath = managerExe;
+                shortcut.Arguments = cmdArgs;
+                shortcut.WorkingDirectory = Path.GetDirectoryName(managerExe) ?? string.Empty;
+                shortcut.Description = "Akıllı Kısayol Yöneticisi tarafından oluşturuldu (Başlatma).";
                 shortcut.Save();
 
                 UpdateStatus("Kısayol masaüstüne yaratıldı: " + shortcutPath, false);
