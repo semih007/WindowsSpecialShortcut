@@ -510,7 +510,7 @@ namespace SmartShortcutManager
             }
             catch (Exception ex)
             {
-                UpdateStatus("Kısayol oluşturulamadı: " + ex.MessaV5 ge, true);
+                UpdateStatus("Kısayol oluşturulamadı: " + ex.Message, true);
             }
         }
 

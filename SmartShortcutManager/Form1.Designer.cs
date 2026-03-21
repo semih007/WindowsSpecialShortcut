@@ -134,7 +134,7 @@ partial class Form1
         Controls.Add(txtMappingName);
         Controls.Add(label2);
         Controls.Add(txtServiceName);
-        Controls.Add(label3); V5
+        Controls.Add(label3);
         Controls.Add(txtExePath);
         Controls.Add(btnAdd);
         Controls.Add(btnStart);
