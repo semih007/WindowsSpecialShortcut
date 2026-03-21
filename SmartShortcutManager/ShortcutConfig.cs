@@ -6,7 +6,7 @@ namespace SmartShortcutManager
     {
         public string Name { get; set; } = string.Empty;
         public List<string> ServiceNames { get; set; } = new();
-        public string ExePath { get; set; } = string.Empty;
+        public List<string> ExePaths { get; set; } = new();
     }
 
     public class Config

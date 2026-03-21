@@ -94,7 +94,7 @@ namespace SmartShortcutManager
             listViewPairs.Items.Clear();
             foreach (var p in _config.Pairs)
             {
-                var item = new ListViewItem(new[] { p.Name, string.Join(", ", p.ServiceNames), p.ExePath });
+                var item = new ListViewItem(new[] { p.Name, string.Join(", ", p.ServiceNames), string.Join(", ", p.ExePaths) });
                 listViewPairs.Items.Add(item);
             }
         }
@@ -173,8 +173,13 @@ namespace SmartShortcutManager
                 }
             }
 
-            var exeName = Path.GetFileNameWithoutExtension(pair.ExePath);
-            return Process.GetProcessesByName(exeName).Any();
+            foreach (var exePath in pair.ExePaths)
+            {
+                var exeName = Path.GetFileNameWithoutExtension(exePath);
+                if (Process.GetProcessesByName(exeName).Any())
+                    return true;
+            }
+            return false;
         }
 
         private void RunScenarioByName(string mapName, bool start)
@@ -199,33 +204,51 @@ namespace SmartShortcutManager
 
             var sel = listViewPairs.SelectedItems[0];
             var serviceNames = sel.SubItems[1].Text.Split(',').Select(s => s.Trim()).ToList();
-            var exePath = sel.SubItems[2].Text;
-            return _config.Pairs.FirstOrDefault(x => x.ServiceNames.SequenceEqual(serviceNames) && x.ExePath == exePath);
+            var exePaths = sel.SubItems[2].Text.Split(',').Select(s => s.Trim()).ToList();
+            return _config.Pairs.FirstOrDefault(x => x.ServiceNames.SequenceEqual(serviceNames) && x.ExePaths.SequenceEqual(exePaths));
         }
 
         private void btnAdd_Click(object sender, EventArgs e)
         {
             var serviceNames = txtServiceName.Text.Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
-            var exePath = txtExePath.Text.Trim();
+            var exePaths = txtExePath.Text.Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
             var name = txtMappingName.Text.Trim();
 
-            if (string.IsNullOrWhiteSpace(name) || serviceNames.Count == 0 || string.IsNullOrWhiteSpace(exePath))
+            if (string.IsNullOrWhiteSpace(name) || serviceNames.Count == 0 || exePaths.Count == 0)
             {
                 UpdateStatus("Tüm alanlar gereklidir.", true);
                 return;
             }
 
-            if (!File.Exists(exePath))
+            foreach (var exe in exePaths)
             {
-                UpdateStatus("Executable dosyası bulunamadı.", true);
-                return;
+                if (!File.Exists(exe))
+                {
+                    UpdateStatus($"Executable dosyası bulunamadı: {exe}", true);
+                    return;
+                }
             }
 
-            var newPair = new ServiceExePair { Name = name, ServiceNames = serviceNames, ExePath = exePath };
+            var newPair = new ServiceExePair { Name = name, ServiceNames = serviceNames, ExePaths = exePaths };
             _config.Pairs.Add(newPair);
             SaveConfig();
             RefreshPairs();
             UpdateStatus("Yeni eşleştirme eklendi.", false);
+        }
+
+        private void btnDelete_Click(object sender, EventArgs e)
+        {
+            var pair = GetSelectedPair();
+            if (pair == null)
+            {
+                UpdateStatus("Silmek için bir eşleştirme seçin.", true);
+                return;
+            }
+
+            _config.Pairs.Remove(pair);
+            SaveConfig();
+            RefreshPairs();
+            UpdateStatus("Eşleştirme silindi.", false);
         }
 
         private void btnStart_Click(object sender, EventArgs e)
@@ -310,21 +333,16 @@ namespace SmartShortcutManager
                 if (!finalCheck)
                     throw new InvalidOperationException("Bir veya daha fazla servis Running durumuna ulaşamadı.");
 
-                UpdateStatus("Servisler çalışıyor. Uygulama başlatılıyor...", false);
+                UpdateStatus("Servisler çalışıyor. Uygulamalar başlatılıyor...", false);
 
-                if (!File.Exists(pair.ExePath))
-                    throw new FileNotFoundException("EXE dosyası bulunamıyor.", pair.ExePath);
-
-                var procName = Path.GetFileName(pair.ExePath);
-                var existing = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(procName));
-                if (existing.Length > 0)
+                foreach (var exePath in pair.ExePaths)
                 {
-                    UpdateStatus("Uygulama zaten çalışıyor.", false);
-                }
-                else
-                {
-                    Process.Start(new ProcessStartInfo(pair.ExePath) { UseShellExecute = true });
-                    UpdateStatus("Uygulama başlatıldı.", false);
+                    var procName = Path.GetFileName(exePath);
+                    var existing = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(procName));
+                    if (existing.Length == 0)
+                    {
+                        Process.Start(new ProcessStartInfo(exePath) { UseShellExecute = true });
+                    }
                 }
             }
             catch (Exception ex)
@@ -340,24 +358,27 @@ namespace SmartShortcutManager
         {
             try
             {
-                UpdateStatus($"{pair.ExePath} süreci kapatılıyor...", false);
-                var exeName = Path.GetFileNameWithoutExtension(pair.ExePath);
-                var processes = Process.GetProcessesByName(exeName);
-
-                // Uygulama kapat komutu ver
-                foreach (var p in processes)
+                UpdateStatus($"{string.Join(", ", pair.ExePaths)} süreçleri kapatılıyor...", false);
+                foreach (var exePath in pair.ExePaths)
                 {
-                    if (!p.HasExited)
-                    {
-                        if (p.CloseMainWindow())
-                        {
-                            p.WaitForExit(5000);
-                        }
+                    var exeName = Path.GetFileNameWithoutExtension(exePath);
+                    var processes = Process.GetProcessesByName(exeName);
 
+                    // Uygulama kapat komutu ver
+                    foreach (var p in processes)
+                    {
                         if (!p.HasExited)
                         {
-                            p.Kill(true);
-                            p.WaitForExit(5000);
+                            if (p.CloseMainWindow())
+                            {
+                                p.WaitForExit(5000);
+                            }
+
+                            if (!p.HasExited)
+                            {
+                                p.Kill(true);
+                                p.WaitForExit(5000);
+                            }
                         }
                     }
                 }
@@ -367,14 +388,30 @@ namespace SmartShortcutManager
                 var appStartTime = DateTime.Now;
                 while (DateTime.Now - appStartTime < appTimeout)
                 {
-                    processes = Process.GetProcessesByName(exeName);
-                    if (processes.Length == 0)
+                    bool allClosed = true;
+                    foreach (var exePath in pair.ExePaths)
+                    {
+                        var exeName = Path.GetFileNameWithoutExtension(exePath);
+                        var processes = Process.GetProcessesByName(exeName);
+                        if (processes.Length > 0)
+                        {
+                            allClosed = false;
+                            break;
+                        }
+                    }
+                    if (allClosed)
                         break;
                     Thread.Sleep(1000);
                 }
 
-                if (Process.GetProcessesByName(exeName).Length > 0)
-                    throw new InvalidOperationException("EXE süreci kapatılamadı.");
+                // Son kontrol: hepsi kapanmış mı?
+                foreach (var exePath in pair.ExePaths)
+                {
+                    var exeName = Path.GetFileNameWithoutExtension(exePath);
+                    var processes = Process.GetProcessesByName(exeName);
+                    if (processes.Length > 0)
+                        throw new InvalidOperationException($"EXE süreci kapatılamadı: {exeName}");
+                }
 
                 UpdateStatus("Uygulama kapatıldı. Servisler durduruluyor...", false);
 
@@ -431,11 +468,12 @@ namespace SmartShortcutManager
         {
             try
             {
-                if (!File.Exists(pair.ExePath))
-                    throw new FileNotFoundException("EXE dosyası bulunamadı.", pair.ExePath);
+                var firstExePath = pair.ExePaths.First();
+                if (!File.Exists(firstExePath))
+                    throw new FileNotFoundException("EXE dosyası bulunamadı.", firstExePath);
 
                 var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-                var shortcutPath = Path.Combine(desktopPath, $"{pair.Name}-{Path.GetFileNameWithoutExtension(pair.ExePath)}.lnk");
+                var shortcutPath = Path.Combine(desktopPath, $"{pair.Name}-{Path.GetFileNameWithoutExtension(firstExePath)}.lnk");
 
                 var shellType = Type.GetTypeFromProgID("WScript.Shell");
                 if (shellType == null)
@@ -459,7 +497,7 @@ namespace SmartShortcutManager
                 shortcut.TargetPath = managerExe;
                 shortcut.Arguments = cmdArgs;
                 shortcut.WorkingDirectory = Path.GetDirectoryName(managerExe) ?? string.Empty;
-                shortcut.Description = "Akıllı Kısayol Yöneticisi tarafından oluşturuldu (Toggle Start/Stop).";
+                shortcut.Description = "Akıllı Kısayol Yöneticisi V5 tarafından oluşturuldu (Toggle Start/Stop).";
                 shortcut.Save();
 
                 UpdateStatus("Kısayol masaüstüne yaratıldı: " + shortcutPath, false);
