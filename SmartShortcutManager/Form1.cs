@@ -266,7 +266,13 @@ namespace SmartShortcutManager
                     throw new PlatformNotSupportedException("WScript.Shell kullanılamıyor.");
 
                 dynamic shell = Activator.CreateInstance(shellType);
+                if (shell == null)
+                    throw new InvalidOperationException("Shell instance oluşturulamadı.");
+
                 dynamic shortcut = shell.CreateShortcut(shortcutPath);
+                if (shortcut == null)
+                    throw new InvalidOperationException("Shortcut oluşturulamadı.");
+
                 shortcut.TargetPath = pair.ExePath;
                 shortcut.WorkingDirectory = Path.GetDirectoryName(pair.ExePath) ?? string.Empty;
                 shortcut.Description = "Akıllı Kısayol Yöneticisi tarafından oluşturuldu.";
