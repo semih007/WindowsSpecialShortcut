@@ -102,30 +102,75 @@ namespace SmartShortcutManager
         {
             try
             {
-                if (args.Length >= 2 && (args[0].Equals("--start", StringComparison.OrdinalIgnoreCase) || args[0].Equals("--stop", StringComparison.OrdinalIgnoreCase)))
+                if (args.Length >= 2)
                 {
+                    var command = args[0].Trim();
                     var name = args[1].Trim('"');
-                    var start = args[0].Equals("--start", StringComparison.OrdinalIgnoreCase);
-                    RunScenarioByName(name, start);
 
-                    if (start)
+                    if (command.Equals("--start", StringComparison.OrdinalIgnoreCase))
+                    {
+                        RunScenarioByName(name, true);
                         UpdateStatus($"{name} için başlatma komutu tamamlandı.", false);
-                    else
+                        Close();
+                        return;
+                    }
+                    if (command.Equals("--stop", StringComparison.OrdinalIgnoreCase))
+                    {
+                        RunScenarioByName(name, false);
                         UpdateStatus($"{name} için durdurma komutu tamamlandı.", false);
+                        Close();
+                        return;
+                    }
+                    if (command.Equals("--toggle", StringComparison.OrdinalIgnoreCase))
+                    {
+                        RunToggleScenarioByName(name);
+                        Close();
+                        return;
+                    }
+                }
 
-                    // Kısayol üzerinden çalıştırıldıysa formu kapat
-                    Close();
-                    return;
-                }
-                else
-                {
-                    UpdateStatus("Komut satırı parametresi bulunamadı veya geçersiz.", true);
-                }
+                UpdateStatus("Komut satırı parametresi bulunamadı veya geçersiz.", true);
             }
             catch (Exception ex)
             {
                 UpdateStatus("Komut satırı işleme hatası: " + ex.Message, true);
             }
+        }
+
+        private void RunToggleScenarioByName(string mapName)
+        {
+            var pair = _config.Pairs.FirstOrDefault(x => x.Name.Equals(mapName, StringComparison.OrdinalIgnoreCase));
+            if (pair == null)
+            {
+                UpdateStatus($"Eşleşme bulunamadı: {mapName}", true);
+                return;
+            }
+
+            if (IsPairRunning(pair))
+            {
+                RunStopScenario(pair);
+            }
+            else
+            {
+                RunStartScenario(pair);
+            }
+        }
+
+        private bool IsPairRunning(ServiceExePair pair)
+        {
+            try
+            {
+                using var service = new ServiceController(pair.ServiceName);
+                if (service.Status != ServiceControllerStatus.Running)
+                    return false;
+            }
+            catch
+            {
+                return false;
+            }
+
+            var exeName = Path.GetFileNameWithoutExtension(pair.ExePath);
+            return Process.GetProcessesByName(exeName).Any();
         }
 
         private void RunScenarioByName(string mapName, bool start)
@@ -331,12 +376,12 @@ namespace SmartShortcutManager
                     throw new InvalidOperationException("Shortcut oluşturulamadı.");
 
                 var managerExe = Application.ExecutablePath;
-                var cmdArgs = $"--start \"{pair.Name}\"";
+                var cmdArgs = $"--toggle \"{pair.Name}\"";
 
                 shortcut.TargetPath = managerExe;
                 shortcut.Arguments = cmdArgs;
                 shortcut.WorkingDirectory = Path.GetDirectoryName(managerExe) ?? string.Empty;
-                shortcut.Description = "Akıllı Kısayol Yöneticisi tarafından oluşturuldu (Başlatma).";
+                shortcut.Description = "Akıllı Kısayol Yöneticisi tarafından oluşturuldu (Toggle Start/Stop).";
                 shortcut.Save();
 
                 UpdateStatus("Kısayol masaüstüne yaratıldı: " + shortcutPath, false);
