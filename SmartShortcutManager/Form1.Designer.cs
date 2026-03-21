@@ -105,12 +105,6 @@ partial class Form1
         btnCreateShortcut.Text = "Kısayol Oluştur";
         btnCreateShortcut.Click += btnCreateShortcut_Click;
 
-        btnDelete = new Button();
-        btnDelete.Location = new System.Drawing.Point(610, 12);
-        btnDelete.Size = new System.Drawing.Size(120, 25);
-        btnDelete.Text = "Eşleştirme Sil";
-        btnDelete.Click += btnDelete_Click;
-
         listViewPairs.Location = new System.Drawing.Point(12, 140);
         listViewPairs.Size = new System.Drawing.Size(760, 260);
         listViewPairs.View = View.Details;
@@ -134,13 +128,13 @@ partial class Form1
 
         AutoScaleMode = AutoScaleMode.Font;
         ClientSize = new System.Drawing.Size(784, 441);
-        Text = "Akıllı Kısayol Yöneticisi";
+        Text = "Akıllı Kısayol Yöneticisi V8";
 
         Controls.Add(label1);
         Controls.Add(txtMappingName);
         Controls.Add(label2);
         Controls.Add(txtServiceName);
-        Controls.Add(label3);
+        Controls.Add(label3); V5
         Controls.Add(txtExePath);
         Controls.Add(btnAdd);
         Controls.Add(btnStart);
