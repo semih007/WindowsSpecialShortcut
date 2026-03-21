@@ -1,6 +1,6 @@
 # WindowsSpecialShortcut
 
-Akıllı Kısayol Yöneticisi V5
+Akıllı Kısayol Yöneticisi
 
 Bu proje, Windows'ta servis + exe eşleştirmesini yönetmek, doğru sıralama ile "Başlat" ve "Durdur" iş akışlarını güvenli şekilde çalıştırmak için tasarlanmıştır.
 

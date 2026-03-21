@@ -18,8 +18,11 @@ namespace SmartShortcutManager
 
         public Form1(string[] args)
         {
+            MessageBox.Show("Form1 constructor başladı");
             InitializeComponent();
+            MessageBox.Show("InitializeComponent tamamlandı");
             _configPath = Path.Combine(Application.StartupPath, "config.json");
+            MessageBox.Show($"Config path: {_configPath}");
 
             if (!IsAdministrator())
             {
@@ -31,14 +34,18 @@ namespace SmartShortcutManager
                 lblStatus.Text = "Yönetici olarak çalışıyor.";
                 lblStatus.ForeColor = System.Drawing.Color.DarkGreen;
             }
+            MessageBox.Show("Admin check tamamlandı");
 
             LoadConfig();
+            MessageBox.Show("LoadConfig tamamlandı");
             RefreshPairs();
+            MessageBox.Show("RefreshPairs tamamlandı");
 
             if (args != null && args.Length > 0)
             {
                 HandleCommandLine(args);
             }
+            MessageBox.Show("Constructor tamamlandı");
         }
 
         public Form1() : this(Array.Empty<string>()) { }
@@ -68,6 +75,12 @@ namespace SmartShortcutManager
                 if (loaded != null)
                 {
                     _config.Pairs = loaded.Pairs ?? new List<ServiceExePair>();
+                    // Ensure backward compatibility and null safety
+                    foreach (var pair in _config.Pairs)
+                    {
+                        pair.ServiceNames ??= new List<string>();
+                        pair.ExePaths ??= new List<string>();
+                    }
                 }
             }
             catch (Exception ex)
@@ -497,7 +510,7 @@ namespace SmartShortcutManager
                 shortcut.TargetPath = managerExe;
                 shortcut.Arguments = cmdArgs;
                 shortcut.WorkingDirectory = Path.GetDirectoryName(managerExe) ?? string.Empty;
-                shortcut.Description = "Akıllı Kısayol Yöneticisi V5 tarafından oluşturuldu (Toggle Start/Stop).";
+                shortcut.Description = "Akıllı Kısayol Yöneticisi tarafından oluşturuldu (Toggle Start/Stop).";
                 shortcut.Save();
 
                 UpdateStatus("Kısayol masaüstüne yaratıldı: " + shortcutPath, false);

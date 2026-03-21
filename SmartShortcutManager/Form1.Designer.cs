@@ -124,7 +124,7 @@ partial class Form1
         columnService.Text = "Servisler";
         columnService.Width = 180;
 
-        columnExe.Text = "Uygulama (EXE)";
+        columnExe.Text = "Uygulamalar (EXE'ler)";
         columnExe.Width = 410;
 
         lblStatus.AutoSize = true;
@@ -134,7 +134,7 @@ partial class Form1
 
         AutoScaleMode = AutoScaleMode.Font;
         ClientSize = new System.Drawing.Size(784, 441);
-        Text = "Akıllı Kısayol Yöneticisi V5";
+        Text = "Akıllı Kısayol Yöneticisi";
 
         Controls.Add(label1);
         Controls.Add(txtMappingName);
