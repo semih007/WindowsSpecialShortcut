@@ -265,11 +265,15 @@ namespace SmartShortcutManager
                 if (shellType == null)
                     throw new PlatformNotSupportedException("WScript.Shell kullanılamıyor.");
 
+#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
                 dynamic shell = Activator.CreateInstance(shellType);
+#pragma warning restore CS8600
                 if (shell == null)
                     throw new InvalidOperationException("Shell instance oluşturulamadı.");
 
+#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
                 dynamic shortcut = shell.CreateShortcut(shortcutPath);
+#pragma warning restore CS8600
                 if (shortcut == null)
                     throw new InvalidOperationException("Shortcut oluşturulamadı.");
 

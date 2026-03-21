@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v4
       - name: Setup .NET
@@ -19,6 +21,11 @@ jobs:
         run: dotnet restore SmartShortcutManager/SmartShortcutManager.csproj
       - name: Build
         run: dotnet build SmartShortcutManager/SmartShortcutManager.csproj --configuration Release --no-restore
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: SmartShortcutManager
+          path: SmartShortcutManager/bin/Release/net8.0-windows/
       - name: Run unit tests (if any)
         run: |
           echo "No unit tests configured in initial seed, skipping."
