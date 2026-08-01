@@ -7,6 +7,7 @@ partial class Form1
     private Label label1;
     private Label label2;
     private Label label3;
+    private Label lblExample;
     private TextBox txtMappingName;
     private TextBox txtServiceName;
     private TextBox txtExePath;
@@ -38,6 +39,7 @@ partial class Form1
         label1 = new Label();
         label2 = new Label();
         label3 = new Label();
+        lblExample = new Label();
         txtMappingName = new TextBox();
         txtServiceName = new TextBox();
         txtExePath = new TextBox();
@@ -66,8 +68,8 @@ partial class Form1
         label2.AutoSize = true;
         label2.Location = new System.Drawing.Point(50, 46);
         label2.Name = "label2";
-        label2.Size = new System.Drawing.Size(120, 15);
-        label2.Text = "Servis Adları (virgülle ayrılmış)";
+        label2.Size = new System.Drawing.Size(120, 30);
+        label2.Text = "Servis Adları\r\n(virgülle ayrılmış)";
 
         txtServiceName.Location = new System.Drawing.Point(150, 43);
         txtServiceName.Size = new System.Drawing.Size(320, 23);
@@ -75,11 +77,18 @@ partial class Form1
         label3.AutoSize = true;
         label3.Location = new System.Drawing.Point(50, 77);
         label3.Name = "label3";
-        label3.Size = new System.Drawing.Size(68, 15);
-        label3.Text = "EXE Yolları (virgülle ayrılmış)";
+        label3.Size = new System.Drawing.Size(90, 30);
+        label3.Text = "EXE Konumları\r\n(virgülle ayrılmış)";
 
         txtExePath.Location = new System.Drawing.Point(150, 74);
         txtExePath.Size = new System.Drawing.Size(320, 23);
+
+        lblExample.AutoSize = true;
+        lblExample.Location = new System.Drawing.Point(150, 105);
+        lblExample.Name = "lblExample";
+        lblExample.Size = new System.Drawing.Size(430, 30);
+        lblExample.ForeColor = System.Drawing.Color.DimGray;
+        lblExample.Text = "Örnek: wuauserv, bits\r\nÖrnek: C:\\Windows\\System32\\notepad.exe, C:\\Program Files\\App\\app.exe";
 
         btnAdd.Location = new System.Drawing.Point(480, 12);
         btnAdd.Size = new System.Drawing.Size(120, 25);
@@ -137,6 +146,7 @@ partial class Form1
         Controls.Add(txtServiceName);
         Controls.Add(label3);
         Controls.Add(txtExePath);
+        Controls.Add(lblExample);
         Controls.Add(btnAdd);
         Controls.Add(btnStart);
         Controls.Add(btnStop);
