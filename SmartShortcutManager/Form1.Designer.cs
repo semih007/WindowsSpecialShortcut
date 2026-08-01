@@ -42,6 +42,7 @@ partial class Form1
         txtServiceName = new TextBox();
         txtExePath = new TextBox();
         btnAdd = new Button();
+        btnDelete = new Button();
         btnStart = new Button();
         btnStop = new Button();
         btnCreateShortcut = new Button();
